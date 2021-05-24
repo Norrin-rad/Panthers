@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "stdAdminUserName": {
+      "value": "localadmin"
+    },
+    "stdAdminPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/8256901c-e671-43d7-b3e5-7b7d8d240656/resourceGroups/keyvault-rg/providers/Microsoft.KeyVault/vaults/av-kv-01"
+        },
+        "secretName": "SecurePassword"
+      }
+    },
+    "diagstorageAccountName": {
+      "value": "diagst2021"
+    },
+    "diagResourceGroup": {
+      "value": "rg-diag"
+    },
+    "diskCount": {
+      "value": 1
+    },
+    "vmSize": {
+      "value": "Standard_D2_v2"
+    },
+    "diskSize": {
+      "value": [
+        "100"
+      ]
+    },
+    "networkName": {
+      "value": "vnet1"
+    },
+    "networkResourceGroup": {
+      "value": "rg--vnet"
+    },
+    "subnetName": {
+      "value": "snet-t-t1te-sqldata"
+    },
+    "vm01IPAddress": {
+      "value": "dynamic"
+    },
+    "vm01VMName": {
+      "value": "vmname"
+    },
+    "stdVMImagePublisher": {
+      "value": "MicrosoftWindowsServer"
+    },
+    "stdVMImageOffer": {
+      "value": "WindowsServer"
+    },
+    "stdWindowsOSVersion": {
+      "value": "2012-R2-Datacenter"
+    }
+  }
+}

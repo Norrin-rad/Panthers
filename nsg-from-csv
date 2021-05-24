@@ -1,0 +1,58 @@
+## NSG from csv
+
+## tip: Use ctrl+m to expand and shrink the regions in Powershell ISE
+
+## CSV format should follow
+
+Computer	Direction	SourcePortRange	SourceIp	DestinationIp	DestinationPort	Protocol	Priority	Access	Rulename	Description
+computer1.domain.com	inbound	80	172.10.10.10	10.10.10.10	135	tcp	101	Allow	rule 01	Description01
+computer2.domain.com	outbound	81	172.10.10.11	10.10.10.11	88	tcp	102	Allow	rule 02	Description02
+computer3.domain.com	inbound	82	172.10.10.12	10.10.10.12	5355	udp	103	Allow	rule 03	Description03
+computer4.domain.com	outbound	83	172.10.10.13	10.10.10.13	9480	tcp	104	Allow	rule 04	Description04
+										
+
+
+
+## Powershell Script
+
+#region Azure Login
+Login-AzAccount
+
+$sub = Get-AzSubscription | ogv -PassThru
+
+Select-AzSubscription -Subscription $sub.Name
+
+#endregion
+
+#region variables 
+
+$csv = "data.csv"
+$rg = "nsgtest"
+$loc = "westeurope"
+
+$NSGname = $($csv).Substring(0,$($csv).Length-4)
+#endregion
+
+#region Create NSG
+$NSG = New-AzNetworkSecurityGroup -Name $NSGname  -ResourceGroupName $rg -Location $loc -Force 
+
+foreach($rule in import-csv "C:\temp\$csv"){
+
+
+$NSG | Add-AzNetworkSecurityRuleConfig `
+-Name $rule.Rulename `
+-Priority $rule.Priority `
+-Protocol $rule.Protocol `
+-Direction $rule.Direction `
+-SourceAddressPrefix $rule.Sourceip `
+-Access $rule.Access `
+-SourcePortRange $rule.SourcePortRange `
+-DestinationAddressPrefix $rule.DestinationIp `
+-DestinationPortRange $rule.DestinationPort `
+-Description $rule.Description
+
+}
+
+$NSG | Set-AzNetworkSecurityGroup -Verbose
+
+#endregion

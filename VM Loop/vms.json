@@ -1,0 +1,338 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+    "stdAdminUserName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stdAdminPassword": {
+      "type": "securestring"
+    },
+	"diagstorageAccountName": {
+      "type": "string",
+      "minLength": 1
+    },
+	"diagResourceGroup": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "costcenter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shutdownSchedule": {
+      "type": "string"
+    },
+	"looplength": {
+      "type": "int",
+      "defaultValue": 1
+    },
+	"diskCount": {
+      "type": "int",
+      "defaultValue": 1
+    },
+    "vmSize": {
+      "type": "array"      
+    },
+    "diskSize": {
+      "type": "array"
+    },
+	
+    "availabilitySetName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "networkName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subnetName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "networkResourceGroup": {
+      "type": "string",
+      "minLength": 1
+    },
+    "VMNames": {
+      "type": "string",
+      "minLength": 1
+    },
+	"NicNames": {
+      "type": "string",
+      "minLength": 1
+    },
+	"IPAddresses": {
+        "type": "array"
+    },
+    "loadBalancerName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "loadBalancerIPAddress": {
+      "type": "string",
+      "minLength": 1
+    },
+    "loadBalancerPort": {
+      "type": "int"
+    },
+    "loadBalancerProbePort": {
+      "type": "int"
+    },
+    "dscConfiguration": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deploymentRole": {
+      "type": "string",
+      "minLength": 1
+    },
+	"stdVMImagePublisher": {
+      "type": "string",
+      "minLength": 1
+    },
+	"stdVMImageOffer": {
+      "type": "string",
+      "minLength": 1
+    },
+	"stdWindowsOSVersion": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "variables": {    
+	"len": "[Parameters('looplength')]",
+	"cnt": "[Parameters('diskCount')]",
+	"templateref": "lbhavmesa v1",
+    "VNetID": "[resourceId(Parameters('networkResourceGroup'), 'Microsoft.Network/virtualNetworks', Parameters('networkname'))]",
+    "LoadBalancerID": "[resourceId('Microsoft.Network/loadBalancers',Parameters('loadBalancerName'))]",
+    "SubnetRef": "[concat(variables('VNetID'), '/subnets/', Parameters('subnetName'))]",
+    "stdVHDContainerName": "vhds"      
+  },
+  "resources": [
+    {
+      "apiVersion": "2016-03-30",
+      "name": "[Parameters('loadBalancerName')]",
+      "type": "Microsoft.Network/loadBalancers",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayname": "[Parameters('loadBalancerName')]",
+        "environment": "[Parameters('environment')]",
+        "templateref": "[variables('templateRef')]",
+        "costcenter": "[Parameters('costcenter')]",
+        "project": "[Parameters('project')]",
+        "role": "[concat(Parameters('deploymentRole'),'-ilb')]"
+      },
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "LoadBalancerInternal",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[Parameters('loadBalancerIPAddress')]",
+              "subnet": {
+                "id": "[variables('SubnetRef')]"
+              }
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "LoadBalancerBackend"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "WFETrafficRule1",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', Parameters('loadBalancerName')), '/frontendIPConfigurations/LoadBalancerInternal')]"
+              },
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', Parameters('loadBalancerName')), '/backendAddressPools/LoadBalancerBackend')]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', Parameters('loadBalancerName')), '/probes/PortProbe1')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": "[parameters('loadBalancerPort')]",
+              "backendPort": "[parameters('loadBalancerPort')]",
+              "enableFloatingIP": false // floating IP should only be set to true if you are load balancing an always on group
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "PortProbe1",
+            "properties": {
+              "protocol": "Tcp",
+              "port": "[parameters('loadBalancerProbePort')]",
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      //"name": "[Parameters('NicNames')[copyIndex()]]",
+	  "name": "[concat(Parameters('NicNames'), copyIndex(1), '-nic1')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      //"apiVersion": "2015-06-15",
+	  "apiVersion": "2016-09-01",
+	  "copy": {
+	    "name": "nicLoop",
+		"count": "[variables('len')]"
+      },
+      "tags": {
+        "displayname": "[concat(Parameters('NicNames'), copyIndex(1), '-nic1')]",
+        "environment": "[Parameters('environment')]",
+        "templateref": "[variables('templateRef')]",
+        "costcenter": "[Parameters('costcenter')]",
+        "project": "[Parameters('project')]",
+        "role": "[concat(Parameters('deploymentRole'),'-nic')]"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/loadBalancers/', Parameters('loadBalancerName'))]"
+      ],
+      "properties": {
+		"enableAcceleratedNetworking": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Static",
+              "privateIPAddress": "[Parameters('IPAddresses')[copyIndex()]]",
+              "subnet": {
+                "id": "[variables('SubnetRef')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[concat(variables('LoadBalancerID'), '/backendAddressPools/LoadBalancerBackend')]"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    
+    {
+      "name": "[Parameters('availabilitySetName')]",
+      "type": "Microsoft.Compute/availabilitySets",
+      "location": "[resourceGroup().location]",
+      //"apiVersion": "2015-06-15",
+      "apiVersion": "2017-03-30",      
+      "tags": {
+        "displayname": "[Parameters('availabilitySetName')]",
+        "environment": "[Parameters('environment')]",
+        "templateref": "[variables('templateRef')]",
+        "costcenter": "[Parameters('costcenter')]",
+        "project": "[Parameters('project')]",
+        "role": "[concat(Parameters('deploymentRole'),'-avset')]"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 1,
+        "platformFaultDomainCount": 1
+      },
+      "sku": {
+         "name": "Aligned"
+      }
+    },
+    {
+      //"name": "[Parameters('VMNames')[copyIndex()]]",
+	  "name": "[concat(Parameters('VMNames'), copyIndex(1))]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      //"apiVersion": "2015-06-15",
+      "apiVersion": "2017-03-30",
+      "dependsOn": [
+        //"[concat('Microsoft.Network/networkInterfaces/', Parameters('NicNames')[copyIndex()])]",
+		"nicLoop",
+        "[concat('Microsoft.Compute/availabilitySets/', Parameters('availabilitySetName'))]"
+      ],
+	  "copy": {
+	    "name": "VMLoop",
+		"count": "[variables('len')]"
+      },
+      "tags": {
+        //"displayname": "[Parameters('VMNames')[copyIndex()]]",
+		"displayname": "[concat(Parameters('VMNames'), copyIndex(1))]",
+        "environment": "[Parameters('environment')]",
+        "templateref": "[variables('templateRef')]",
+        "costcenter": "[Parameters('costcenter')]",
+        "project": "[Parameters('project')]",
+        "shutdownSchedule": "[parameters('shutdownSchedule')]",
+        "dsc": "[Parameters('dscConfiguration')]"
+      },
+      "properties": {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets',Parameters('availabilitySetName'))]"
+        },
+        "hardwareProfile": {
+          "vmSize": "[Parameters('vmSize')[copyIndex()]]"
+        },
+        "osProfile": {
+		  "computerName": "[concat(Parameters('VMNames'), copyIndex(1))]",
+          "adminUsername": "[Parameters('stdAdminUserName')]",
+          "adminPassword": "[Parameters('stdAdminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('STDVMImagePublisher')]",
+            "offer": "[parameters('STDVMImageOffer')]",
+            "sku": "[parameters('stdWindowsOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {            
+			"name": "[concat(Parameters('VMNames'), copyIndex(1), '-osdisk')]",
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          },
+          "copy": [
+            {
+              "name": "datadisks",
+              "count": "[variables('cnt')]",
+              "input": {
+                "name": "[concat(Parameters('VMNames'), add(copyIndex('VMLoop'), 1), '-dataDisk', add(copyIndex('datadisks'), 1))]",                
+				"createOption": "Empty",
+				"diskSizeGB": "[Parameters('diskSize')[copyIndex('datadisks')]]",                
+				//"vhd": {
+				//	"uri": "[concat('http://', Parameters('storageAccountName'), '.blob.core.windows.net/', variables('stdVHDContainerName'), '/', //Parameters('VMNames'), add(copyIndex('VMLoop'), 1), '-dataDisk', add(copyIndex('datadisks'), 1), '.vhd')]"
+				//},
+                "caching": "None",
+                "lun": "[copyIndex('datadisks')]"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(Parameters('NicNames'), copyIndex(1), '-nic1'))]"		  
+			  
+            }
+          ]
+        },
+		"diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,            
+			"storageUri": "[concat(reference(concat(resourceId(Parameters('diagResourceGroup'),'Microsoft.Storage/storageAccounts/', Parameters('diagstorageAccountName'))), '2016-01-01').primaryEndpoints.blob)]"
+          }
+        }
+      }
+    }    
+  ],
+  "outputs": {
+  }
+}

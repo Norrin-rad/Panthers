@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "value": "localadmin1"
+    },
+    "adminPassword": {
+      "value": "P@ssword1290"
+    },
+    "galleryName": {
+      "value": "ginavanadesig"
+    },
+    "galleryImageDefinitionName": {
+      "value": "win-2016-dc"
+    },
+    "galleryImageVersionName": {
+      "value": "0.0.1"
+    },
+    "zone": {
+      "value": "1"
+    },
+    "vmName": {
+      "value": "test-vm-26"
+    },
+    "vmSize": {
+      "value": "Standard_D2s_v4"
+    },
+    "networkName": {
+      "value": "vnet1"
+    },
+    "networkResourceGroup": {
+      "value": "vnet-rg"
+    },
+    "subnetName": {
+      "value": "sub-1"
+    },
+    "loadBalancerName": {
+      "value": "ilb-mass-01"
+    },
+    "loadBalancerPort": {
+      "value": 443
+    },
+    "loadBalancerProbePort": {
+      "value": 80
+    }
+  }
+}

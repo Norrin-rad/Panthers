@@ -1,0 +1,216 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Username for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "SecureString",
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "galleryName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Shared Image Gallery."
+      }
+    },
+    "galleryImageDefinitionName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Image Definition."
+      }
+    },
+    "galleryImageVersionName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Image Version - should follow <MajorVersion>.<MinorVersion>.<Patch>."
+      }
+    },
+    "zone": {
+      "type": "string",
+      "defaultValue": "1",
+      "allowedValues": [
+        "1",
+        "2",
+        "3"
+      ],
+      "metadata": {
+        "description": "Zone number for the virtual machine"
+      }
+    },
+    "vmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the vm"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the vm"
+      }
+    },
+    "networkName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "networkResourceGroup": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subnetName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "loadBalancerName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "loadBalancerPort": {
+      "type": "int"
+    },
+    "loadBalancerProbePort": {
+      "type": "int"
+    }
+  },
+  "variables": {
+    "nicName": "[concat(uniquestring(resourceGroup().id), 'myVMNic')]",
+    "VNetID": "[resourceId(Parameters('networkResourceGroup'), 'Microsoft.Network/virtualNetworks', Parameters('networkname'))]",
+    "SubnetRef": "[concat(variables('VNetID'), '/subnets/', Parameters('subnetName'))]",
+    "vm01NicName": "[concat(parameters('vmName'), '-nic1')]",
+    "LoadBalancerID": "[resourceId('Microsoft.Network/loadBalancers',Parameters('loadBalancerName'))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2017-08-01",
+      "name": "[Parameters('loadBalancerName')]",
+      "type": "Microsoft.Network/loadBalancers",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayname": "[Parameters('loadBalancerName')]"
+      },
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "LoadBalancerInternal",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SubnetRef')]"
+              }
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "LoadBalancerBackend"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "WFETrafficRule1",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', Parameters('loadBalancerName')), '/frontendIPConfigurations/LoadBalancerInternal')]"
+              },
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', Parameters('loadBalancerName')), '/backendAddressPools/LoadBalancerBackend')]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', Parameters('loadBalancerName')), '/probes/PortProbe1')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": "[parameters('loadBalancerPort')]",
+              "backendPort": "[parameters('loadBalancerPort')]",
+              "enableFloatingIP": false
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "PortProbe1",
+            "properties": {
+              "protocol": "Tcp",
+              "port": "[parameters('loadBalancerProbePort')]",
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('vm01NicName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-09-01",
+      "tags": {
+        "displayname": "[variables('vm01NicName')]"
+      },
+      "properties": {
+        "enableAcceleratedNetworking": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SubnetRef')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[concat(variables('LoadBalancerID'), '/backendAddressPools/LoadBalancerBackend')]"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('vmName')]",
+      "apiVersion": "2018-04-01",
+      "location": "[resourceGroup().location]",
+      "zones": [
+        "[parameters('zone')]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "id": "[resourceId('Microsoft.Compute/galleries/images/versions', parameters('galleryName'), parameters('galleryImageDefinitionName'), parameters('galleryImageVersionName'))]"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('vm01NicName'))]"
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces/', variables('vm01NicName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+  }
+}
